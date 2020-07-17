@@ -26,6 +26,9 @@ export {
   SESSION_COOKIE_NAME,
   stopSessionManagement,
 } from './sessionManagement'
+export {
+  TraceIdentifier
+} from './spanCollection'
 export { HttpRequest, Batch } from './transport'
 export * from './urlPolyfill'
 export * from './utils'

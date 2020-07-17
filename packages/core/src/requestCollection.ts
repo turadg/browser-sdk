@@ -4,6 +4,7 @@ import { Observable } from './observable'
 import { computeStackTrace } from './tracekit'
 import { normalizeUrl } from './urlPolyfill'
 import { ResourceKind } from './utils'
+import { traceFetch, traceXhr, TraceIdentifier } from './spanCollection'
 
 export enum RequestType {
   FETCH = ResourceKind.FETCH,
@@ -24,11 +25,7 @@ export interface RequestCompleteEvent {
   responseType?: string
   startTime: number
   duration: number
-  traceId?: number
-}
-
-interface BrowserWindow extends Window {
-  ddtrace?: any
+  traceId?: TraceIdentifier
 }
 
 interface BrowserXHR extends XMLHttpRequest {
@@ -73,6 +70,7 @@ export function trackXhr([requestStartObservable, requestCompleteObservable]: Re
   XMLHttpRequest.prototype.send = function(this: BrowserXHR, body: unknown) {
     const startTime = performance.now()
     const requestId = getNextRequestId()
+    const traceId = traceXhr(this)
 
     requestStartObservable.notify({
       requestId,
@@ -91,7 +89,7 @@ export function trackXhr([requestStartObservable, requestCompleteObservable]: Re
         method: this._datadog_xhr.method,
         response: this.response as string | undefined,
         status: this.status,
-        traceId: getTraceId(),
+        traceId,
         type: RequestType.XHR,
         url: normalizeUrl(this._datadog_xhr.url),
       })
@@ -125,6 +123,10 @@ export function trackFetch([requestStartObservable, requestCompleteObservable]: 
     const method = (init && init.method) || (typeof input === 'object' && input.method) || 'GET'
     const startTime = performance.now()
     const requestId = getNextRequestId()
+    const traceResult = traceFetch(init)
+    const traceId = traceResult.traceId
+
+    init = traceResult.init
 
     requestStartObservable.notify({
       requestId,
@@ -143,7 +145,7 @@ export function trackFetch([requestStartObservable, requestCompleteObservable]: 
           url,
           response: toStackTraceString(stackTrace),
           status: 0,
-          traceId: getTraceId(),
+          traceId,
           type: RequestType.FETCH,
         })
       } else if ('status' in response) {
@@ -162,7 +164,7 @@ export function trackFetch([requestStartObservable, requestCompleteObservable]: 
           response: text,
           responseType: response.type,
           status: response.status,
-          traceId: getTraceId(),
+          traceId,
           type: RequestType.FETCH,
         })
       }
@@ -179,24 +181,4 @@ export function isRejected(request: RequestCompleteEvent) {
 
 export function isServerError(request: RequestCompleteEvent) {
   return request.status >= 500
-}
-
-/**
- * Get the current traceId generated from dd-trace-js (if any).
- *
- * Note: in order to work, the browser-sdk should be initialized *before* dd-trace-js because both
- * libraries are wrapping fetch() and XHR.  Wrappers are called in reverse order, and the
- * dd-trace-js wrapper needs to be called first so it can generate the new trace.  The browser-sdk
- * wrapper will then pick up the new trace id via this function.
- */
-function getTraceId(): number | undefined {
-  // tslint:disable-next-line: no-unsafe-any
-  return 'ddtrace' in window && (window as BrowserWindow).ddtrace.tracer.scope().active()
-    ? // tslint:disable-next-line: no-unsafe-any
-      (window as BrowserWindow).ddtrace.tracer
-        .scope()
-        .active()
-        .context()
-        .toTraceId()
-    : undefined
 }

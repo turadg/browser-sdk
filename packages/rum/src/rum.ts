@@ -19,6 +19,7 @@ import {
   RequestType,
   ResourceKind,
   withSnakeCaseKeys,
+  TraceIdentifier,
 } from '@datadog/browser-core'
 
 import { LifeCycle, LifeCycleEventType } from './lifeCycle'
@@ -85,7 +86,7 @@ export interface RumResourceEvent {
   resource: {
     kind: ResourceKind
   }
-  traceId?: number
+  traceId?: TraceIdentifier
 }
 
 export interface RumErrorEvent {

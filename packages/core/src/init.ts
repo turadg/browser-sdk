@@ -2,6 +2,7 @@ import { buildConfiguration, UserConfiguration } from './configuration'
 import { areCookiesAuthorized } from './cookie'
 import { startErrorCollection } from './errorCollection'
 import { setDebugMode, startInternalMonitoring } from './internalMonitoring'
+import { startSpanCollection } from './spanCollection'
 
 export function makeStub(methodName: string) {
   console.warn(`'${methodName}' not yet available, please call '.init()' first.`)
@@ -47,6 +48,8 @@ export function commonInit(userConfiguration: UserConfiguration, buildEnv: Build
   const configuration = buildConfiguration(userConfiguration, buildEnv)
   const internalMonitoring = startInternalMonitoring(configuration)
   const errorObservable = startErrorCollection(configuration)
+
+  startSpanCollection(userConfiguration)
 
   return {
     configuration,
